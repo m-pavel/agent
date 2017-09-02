@@ -1,0 +1,5 @@
+FROM golang:1.9-windowsservercore
+COPY . c:/gopath/src/github.com/buildkite/agent
+WORKDIR c:\\gopath\\src\\github.com\\buildkite\\agent
+RUN go build -i -o c:\gopath\bin\buildkite-agent github.com\buildkite\agent
+CMD ["c:\gopath\bin\buildkite-agent", "start"]
