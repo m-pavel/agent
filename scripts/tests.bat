@@ -1,7 +1,5 @@
 @echo off
 
-set image_name=buildkite-agent-%BUILDKITE-BUILD_NUMBER%
-
-docker build -f .\Dockerfile-windows --tag %image_name% .
-docker run --rm -it %image_name% go test ./...
-docker rm %image_name%
+docker build -f .\Dockerfile-windows --tag buildkiteagent%BUILDKITE_BUILD_NUMBER% .
+docker run --rm -it buildkiteagent%BUILDKITE_BUILD_NUMBER% go test ./...
+docker rm buildkiteagent%BUILDKITE_BUILD_NUMBER%
