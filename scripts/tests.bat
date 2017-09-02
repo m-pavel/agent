@@ -1,7 +1,7 @@
 @echo off
 
 docker build -f .\Dockerfile-windows --tag buildkiteagent%BUILDKITE_BUILD_NUMBER% . || goto :error
-docker run --rm buildkiteagent%BUILDKITE_BUILD_NUMBER% go test ./... || goto :error
+docker run --rm buildkiteagent%BUILDKITE_BUILD_NUMBER% go test -v ./... || goto :error
 goto :EOF
 
 :error
