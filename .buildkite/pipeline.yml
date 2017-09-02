@@ -6,10 +6,7 @@ steps:
         run: agent
 
   - name: ":hammer: :windows:"
-    command: "scripts/tests.sh"
-    plugins:
-      docker-compose#v1.5.0:
-        run: agent
+    command: "scripts/tests.bat"
     agents:
       queue: "windows"
 
