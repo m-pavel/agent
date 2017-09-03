@@ -12,10 +12,14 @@ import (
 	"time"
 
 	"github.com/buildkite/agent/api"
-	"github.com/buildkite/agent/glob"
 	"github.com/buildkite/agent/logger"
 	"github.com/buildkite/agent/pool"
 	"github.com/buildkite/agent/retry"
+	zglob "github.com/mattn/go-zglob"
+)
+
+const (
+	ArtifactPathDelimiter = ";"
 )
 
 type ArtifactUploader struct {
@@ -53,48 +57,60 @@ func (a *ArtifactUploader) Upload() error {
 	return nil
 }
 
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return fi.IsDir()
+}
+
 func (a *ArtifactUploader) Collect() (artifacts []*api.Artifact, err error) {
-	globPaths := strings.Split(a.Paths, ";")
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
 
-	for _, globPath := range globPaths {
-		workingDirectory := glob.Root(globPath)
+	for _, globPath := range strings.Split(a.Paths, ArtifactPathDelimiter) {
 		globPath = strings.TrimSpace(globPath)
+		if globPath == "" {
+			continue
+		}
 
-		if globPath != "" {
-			logger.Debug("Searching for %s", filepath.Join(workingDirectory, globPath))
+		logger.Debug("Searching for %s", globPath)
 
-			files, err := glob.Glob(workingDirectory, globPath)
+		// Resolve the globs (with * and ** in them)
+		files, err := zglob.Glob(globPath)
+		if err != nil {
+			return nil, err
+		}
+
+		// Process each glob match into an api.Artifact
+		for _, file := range files {
+			absolutePath, err := filepath.Abs(file)
 			if err != nil {
 				return nil, err
 			}
 
-			for _, file := range files {
-				// Generate an absolute path for the artifact
-				absolutePath, err := filepath.Abs(file)
-				if err != nil {
-					return nil, err
-				}
-
-				if isDir, _ := glob.IsDir(absolutePath); isDir {
-					logger.Debug("Skipping directory %s", file)
-					continue
-				}
-
-				// Create a relative path (from the workingDirectory) to the artifact, by removing the
-				// first part of the absolutePath that is the workingDirectory.
-				relativePath := strings.Replace(absolutePath, workingDirectory, "", 1)
-
-				// Ensure the relativePath doesn't have a file seperator "/" as the first character
-				relativePath = strings.TrimPrefix(relativePath, string(os.PathSeparator))
-
-				// Build an artifact object using the paths we have.
-				artifact, err := a.build(relativePath, absolutePath, globPath)
-				if err != nil {
-					return nil, err
-				}
-
-				artifacts = append(artifacts, artifact)
+			// Ignore directories, we only want files
+			if isDir(absolutePath) {
+				logger.Debug("Skipping directory %s", file)
+				continue
 			}
+
+			// Store the path relative to the current working dir too
+			relativePath, err := filepath.Rel(wd, absolutePath)
+			if err != nil {
+				return nil, err
+			}
+
+			// Build an artifact object using the paths we have.
+			artifact, err := a.build(relativePath, absolutePath, globPath)
+			if err != nil {
+				return nil, err
+			}
+
+			artifacts = append(artifacts, artifact)
 		}
 	}
 
